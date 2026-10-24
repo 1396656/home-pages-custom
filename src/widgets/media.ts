@@ -24,8 +24,12 @@ export interface MediaConfig extends Record<string, unknown> {
   limit: number;
   qiushiUrl: string;
   zjxcUrl: string;
+  nfwpUrl: string;
+  ycwbUrl: string;
   showQiushi: boolean;
   showZjxc: boolean;
+  showNfwp: boolean;
+  showYcwb: boolean;
   customFeeds: CustomFeed[];
   clipFolder: string;
   showClipper: boolean;
@@ -37,8 +41,12 @@ const DEFAULTS: MediaConfig = {
   limit: 20,
   qiushiUrl: "https://www.qstheory.cn/20251231/2d916da295774130ac2fb223fd208895/c.html",
   zjxcUrl: "https://zjnews.zjol.com.cn/zjxc/",
+  nfwpUrl: "https://opinion.southcn.com/node_87fa4020d8",
+  ycwbUrl: "https://sp.ycwb.com/sp_1.htm",
   showQiushi: true,
   showZjxc: true,
+  showNfwp: true,
+  showYcwb: true,
   customFeeds: [],
   clipFolder: "主流媒体",
   showClipper: true
@@ -46,7 +54,7 @@ const DEFAULTS: MediaConfig = {
 
 export interface MediaItem {
   id: string;
-  sourceKey: "qiushi" | "zjxc" | "custom";
+  sourceKey: "qiushi" | "zjxc" | "nfwp" | "ycwb" | "custom";
   sourceName: string;
   category?: string;
   title: string;
@@ -74,12 +82,15 @@ export interface MediaData {
 const cacheStore = new Map<string, MediaData>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes
 
-/** 抓取网络文本，配置桌面浏览器 UA */
-async function fetchText(url: string): Promise<string> {
+/** 金羊网（羊城晚报）对桌面 Chrome UA 返回 JS 反爬页，移动端 UA 才返回正常列表 */
+const MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+/** 抓取网络文本，默认配置桌面浏览器 UA，可按源覆盖 */
+async function fetchText(url: string, userAgent?: string): Promise<string> {
   const response = await requestUrl({
     url,
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "User-Agent": userAgent ?? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
     }
@@ -234,6 +245,106 @@ export function parseZjxcArticles(html: string, baseUrl = "https://zjnews.zjol.c
   }
 
   return items;
+}
+
+// ---- 南方网评（南方网评论频道）-----------------------------------------------
+
+/**
+ * 解析南方网评论频道的稿件列表页（如 opinion.southcn.com/node_e4f9db6b4d 南方快评）。
+ * 每篇稿件是一个 `<div class="itm j-link" data-link="文章地址">` 块，内含缩略图、标题、摘要与时间。
+ */
+export function parseSouthcnOpinion(html: string, options?: { name?: string; column?: string }): MediaItem[] {
+  const items: MediaItem[] = [];
+  const starts: number[] = [];
+  const marker = /<div class="itm j-link"[^>]*data-link="([^"]+)"/gi;
+  let found: RegExpExecArray | null;
+  const links: string[] = [];
+  while ((found = marker.exec(html)) !== null) {
+    starts.push(found.index);
+    links.push(found[1].trim());
+  }
+  for (let i = 0; i < starts.length; i++) {
+    const block = html.slice(starts[i], starts[i + 1] ?? html.length);
+    const titleMatch = block.match(/<h3[\s\S]*?<a[^>]+title="([^"]*)"/i) || block.match(/<a[^>]+title="([^"]*)"/i);
+    const title = (titleMatch?.[1] ?? "").replace(/\s+/g, " ").trim();
+    if (!title || !links[i]) continue;
+    const summary = block.match(/<div class="pa">([\s\S]*?)<\/div>/i)?.[1]
+      ?.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const timeText = block.match(/<div class="time">\s*([\s\S]*?)\s*<\/div>/i)?.[1]?.trim() ?? "";
+    const thumb = block.match(/<img[^>]+src="([^"]+)"/i)?.[1]?.replace(/&amp;/g, "&");
+    const timestamp = timeText ? Date.parse(timeText.replace(" ", "T")) : NaN;
+    items.push({
+      id: `nfwp:${links[i]}`,
+      sourceKey: "nfwp",
+      sourceName: options?.name ?? "南方网评",
+      title,
+      column: options?.column,
+      date: timeText ? timeText.slice(0, 16) : "",
+      timestamp: Number.isFinite(timestamp) ? timestamp : Date.now() - i * 60000,
+      url: links[i],
+      summary: summary || undefined,
+      thumbnail: thumb && !thumb.includes("logo") ? thumb : undefined
+    });
+  }
+  return items;
+}
+
+// ---- 羊城晚报（羊晚V评等静态栏目页）-----------------------------------------
+
+/**
+ * 解析金羊网栏目列表页（如 sp.ycwb.com/node_204883.htm 羊晚V评）。
+ * 结构：`<ul class="lists"><li><a href="..."><span>标题 | 羊晚V评</span><span class="time">时间</span></a></li>`。
+ */
+export function parseYcwbList(html: string, options?: { name?: string; column?: string }): MediaItem[] {
+  const items: MediaItem[] = [];
+  const listMatch = html.match(/<ul class="lists">([\s\S]*?)<\/ul>/i);
+  const body = listMatch ? listMatch[1] : html;
+  const regex = /<li[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span class="time">([\s\S]*?)<\/span>/gi;
+  let match: RegExpExecArray | null;
+  let index = 0;
+  while ((match = regex.exec(body)) !== null) {
+    const url = match[1].trim();
+    const title = match[2]
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s*\|\s*羊晚[^|]*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!title || !url) continue;
+    const timeText = match[3].replace(/\s+/g, " ").trim();
+    const timestamp = timeText ? Date.parse(timeText.replace(" ", "T")) : NaN;
+    items.push({
+      id: `ycwb:${url}`,
+      sourceKey: "ycwb",
+      sourceName: options?.name ?? "珠江评论",
+      title,
+      column: options?.column ?? "金羊视角",
+      date: timeText.slice(0, 16),
+      timestamp: Number.isFinite(timestamp) ? timestamp : Date.now() - index * 60000,
+      url
+    });
+    index += 1;
+  }
+  return items;
+}
+
+/**
+ * 网页栏目页的「下一页」地址。
+ * 南方网评论用查询参数 `?cms_node_post_list_page=N`；金羊网珠江评论用 `sp_1_N.htm`。
+ * 其它地址（RSS、固定单页）返回 null，表示不支持翻页。
+ */
+export function nextPageUrl(url: string, page: number): string | null {
+  if (page < 2) return null;
+  const trimmed = url.trim();
+  if (/\/sp_1\.htm$/i.test(trimmed)) {
+    return trimmed.replace(/\/sp_1\.htm$/i, `/sp_1_${page}.htm`);
+  }
+  if (/\/sp_1_\d+\.htm$/i.test(trimmed)) {
+    return trimmed.replace(/\/sp_1_\d+\.htm$/i, `/sp_1_${page}.htm`);
+  }
+  if (/opinion\.southcn\.com\//i.test(trimmed)) {
+    return `${trimmed.replace(/\?.*$/, "")}?cms_node_post_list_page=${page}`;
+  }
+  return null;
 }
 
 // ---- 通用 RSS / Atom 解析 ---------------------------------------------------
@@ -664,7 +775,13 @@ export function scheduleSaveDiskCache(app: App): void {
 
 /** 同步获取内存/磁盘缓存数据，供 0ms 瞬间渲染 */
 export function getCachedMediaData(config: MediaConfig): MediaData | null {
-  const cacheKey = JSON.stringify({ qiushiUrl: config.qiushiUrl, zjxcUrl: config.zjxcUrl, customFeeds: config.customFeeds });
+  const cacheKey = JSON.stringify({
+    qiushiUrl: config.qiushiUrl,
+    zjxcUrl: config.zjxcUrl,
+    nfwpUrl: config.nfwpUrl,
+    ycwbUrl: config.ycwbUrl,
+    customFeeds: config.customFeeds
+  });
   const cached = cacheStore.get(cacheKey);
   if (cached && cached.items && cached.items.length > 0) {
     return cached;
@@ -684,6 +801,20 @@ export function getCachedMediaData(config: MediaConfig): MediaData | null {
     const z = feedCacheStore.get(`internal:zjxc:${config.zjxcUrl.trim()}`);
     if (z?.items?.length) {
       items.push(...z.items);
+      found = true;
+    }
+  }
+  if (config.showNfwp !== false && String(config.nfwpUrl ?? "").trim()) {
+    const nf = feedCacheStore.get(`internal:nfwp:${String(config.nfwpUrl).trim()}`);
+    if (nf?.items?.length) {
+      items.push(...nf.items);
+      found = true;
+    }
+  }
+  if (config.showYcwb !== false && String(config.ycwbUrl ?? "").trim()) {
+    const yc = feedCacheStore.get(`internal:ycwb:${String(config.ycwbUrl).trim()}`);
+    if (yc?.items?.length) {
+      items.push(...yc.items);
       found = true;
     }
   }
@@ -714,11 +845,11 @@ export function getCachedMediaData(config: MediaConfig): MediaData | null {
 }
 
 /** 单源超时熔断请求，4s 超时防止慢速源阻塞，带超时清理 */
-async function fetchWithTimeout(url: string, timeoutMs = 4000): Promise<string> {
+async function fetchWithTimeout(url: string, timeoutMs = 4000, userAgent?: string): Promise<string> {
   let timerId: number | undefined;
   try {
     return await Promise.race([
-      fetchText(url),
+      fetchText(url, userAgent),
       new Promise<string>((_, reject) => {
         timerId = window.setTimeout(() => reject(new Error(`请求超时（>${timeoutMs}ms）: ${url}`)), timeoutMs);
       })
@@ -743,11 +874,17 @@ export interface SyncOptions {
 /** 高并发、通道优先级调度、支持渐进式首屏回调的综合数据同步器 */
 export async function syncMediaData(config: MediaConfig, options: SyncOptions = {}): Promise<MediaData> {
   const { forceRefresh = false, activeChannel = "all", onProgress } = options;
-  const cacheKey = JSON.stringify({ qiushiUrl: config.qiushiUrl, zjxcUrl: config.zjxcUrl, customFeeds: config.customFeeds });
+  const cacheKey = JSON.stringify({
+    qiushiUrl: config.qiushiUrl,
+    zjxcUrl: config.zjxcUrl,
+    nfwpUrl: config.nfwpUrl,
+    ycwbUrl: config.ycwbUrl,
+    customFeeds: config.customFeeds
+  });
 
   const tasks: Array<{
     id: string;
-    sourceKey: "qiushi" | "zjxc" | "custom";
+    sourceKey: "qiushi" | "zjxc" | "nfwp" | "ycwb" | "custom";
     priority: number;
     run: () => Promise<MediaItem[]>;
   }> = [];
@@ -829,7 +966,65 @@ export async function syncMediaData(config: MediaConfig, options: SyncOptions = 
     });
   }
 
-  // 3. 自定义订阅源任务（通道优先级调度）
+  // 3. 南方网评抓取任务
+  if (config.showNfwp !== false && String(config.nfwpUrl ?? "").trim()) {
+    const nfUrl = String(config.nfwpUrl).trim();
+    tasks.push({
+      id: "nfwp",
+      sourceKey: "nfwp",
+      priority: activeChannel === "nfwp" ? 0 : 1,
+      run: async () => {
+        const cacheId = `internal:nfwp:${nfUrl}`;
+        const cached = feedCacheStore.get(cacheId);
+        if (!forceRefresh && cached && Date.now() - cached.fetchedAt < FEED_CACHE_TTL_MS) {
+          return cached.items;
+        }
+        try {
+          const html = await fetchWithTimeout(nfUrl, 4000);
+          const articles = parseSouthcnOpinion(html);
+          if (articles.length > 0) {
+            feedCacheStore.set(cacheId, { items: articles, fetchedAt: Date.now() });
+          }
+          return articles;
+        } catch (err) {
+          console.warn("Home Pages: 加载南方网评失败", err);
+          if (cached?.items?.length) return cached.items;
+          return [];
+        }
+      }
+    });
+  }
+
+  // 4. 羊城晚报（羊晚V评）抓取任务
+  if (config.showYcwb !== false && String(config.ycwbUrl ?? "").trim()) {
+    const ycUrl = String(config.ycwbUrl).trim();
+    tasks.push({
+      id: "ycwb",
+      sourceKey: "ycwb",
+      priority: activeChannel === "ycwb" ? 0 : 1,
+      run: async () => {
+        const cacheId = `internal:ycwb:${ycUrl}`;
+        const cached = feedCacheStore.get(cacheId);
+        if (!forceRefresh && cached && Date.now() - cached.fetchedAt < FEED_CACHE_TTL_MS) {
+          return cached.items;
+        }
+        try {
+          const html = await fetchWithTimeout(ycUrl, 4000, MOBILE_UA);
+          const articles = parseYcwbList(html);
+          if (articles.length > 0) {
+            feedCacheStore.set(cacheId, { items: articles, fetchedAt: Date.now() });
+          }
+          return articles;
+        } catch (err) {
+          console.warn("Home Pages: 加载羊城晚报失败", err);
+          if (cached?.items?.length) return cached.items;
+          return [];
+        }
+      }
+    });
+  }
+
+  // 5. 自定义订阅源任务（通道优先级调度）
   const enabledFeeds = (Array.isArray(config.customFeeds) ? config.customFeeds : [])
     .filter((feed) => feed.enabled !== false && feed.url?.trim());
 
@@ -925,7 +1120,13 @@ export async function syncMediaData(config: MediaConfig, options: SyncOptions = 
 }
 
 export async function loadMediaData(config: MediaConfig, forceRefresh = false): Promise<MediaData> {
-  const cacheKey = JSON.stringify({ qiushiUrl: config.qiushiUrl, zjxcUrl: config.zjxcUrl, customFeeds: config.customFeeds });
+  const cacheKey = JSON.stringify({
+    qiushiUrl: config.qiushiUrl,
+    zjxcUrl: config.zjxcUrl,
+    nfwpUrl: config.nfwpUrl,
+    ycwbUrl: config.ycwbUrl,
+    customFeeds: config.customFeeds
+  });
   if (!forceRefresh) {
     const cached = cacheStore.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
@@ -1072,6 +1273,18 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
     config.clipFolder = config.clipFolder?.trim() || DEFAULTS.clipFolder;
     config.qiushiUrl = config.qiushiUrl?.trim() || DEFAULTS.qiushiUrl;
     config.zjxcUrl = config.zjxcUrl?.trim() || DEFAULTS.zjxcUrl;
+    config.nfwpUrl = String(config.nfwpUrl ?? "").trim() || DEFAULTS.nfwpUrl;
+    // 旧版默认是「南方快评」子栏目，自动迁移到「南方评论」头条栏目。
+    if (config.nfwpUrl === "https://opinion.southcn.com/node_e4f9db6b4d" || config.nfwpUrl === "http://opinion.southcn.com/node_e4f9db6b4d") {
+      config.nfwpUrl = DEFAULTS.nfwpUrl;
+    }
+    config.ycwbUrl = String(config.ycwbUrl ?? "").trim() || DEFAULTS.ycwbUrl;
+    // 旧版默认是「羊晚V评」视频栏目，自动迁移到「珠江评论·金羊视角」图文栏目。
+    if (config.ycwbUrl === "http://sp.ycwb.com/node_204883.htm" || config.ycwbUrl === "https://sp.ycwb.com/node_204883.htm") {
+      config.ycwbUrl = DEFAULTS.ycwbUrl;
+    }
+    config.showNfwp = config.showNfwp !== false;
+    config.showYcwb = config.showYcwb !== false;
     config.customFeeds = (Array.isArray(config.customFeeds) ? config.customFeeds : []).map((feed) => ({
       name: String(feed?.name ?? "").trim(),
       url: String(feed?.url ?? "").trim(),
@@ -1137,6 +1350,16 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
     let searchKeyword = "";
     const batchSize = Math.max(config.limit || 20, 20);
     let visibleCount = batchSize;
+    // 网页栏目页的翻页状态：当前已加载到第几页（第 1 页来自首屏同步）。
+    let pageNumber = 1;
+    let isPageLoading = false;
+
+    /** 当前频道对应的网页栏目地址；只有南方网评 / 珠江评论这类单页栏目支持翻页。 */
+    const pageableUrl = (): string | null => {
+      if (config.channel === "nfwp") return config.nfwpUrl.trim();
+      if (config.channel === "ycwb") return config.ycwbUrl.trim();
+      return null;
+    };
 
     // 工具栏容器（频道选择 + 实时搜索）
     const toolbar = wrap.createDiv({ cls: "hp-media-toolbar" });
@@ -1149,6 +1372,7 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
       selectEl.addEventListener("change", () => {
         if (selectEl) {
           visibleCount = batchSize;
+          pageNumber = 1;
           config.channel = selectEl.value;
           void ctx.saveConfig({ channel: selectEl.value });
           renderListItems();
@@ -1183,6 +1407,14 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
       if (config.showZjxc) {
         const zCount = items.filter((item) => item.sourceKey === "zjxc").length;
         options.push({ key: "zjxc", label: "浙江宣传", count: zCount });
+      }
+      if (config.showNfwp !== false) {
+        const nCount = items.filter((item) => item.sourceKey === "nfwp").length;
+        options.push({ key: "nfwp", label: "南方网评", count: nCount });
+      }
+      if (config.showYcwb !== false) {
+        const yCount = items.filter((item) => item.sourceKey === "ycwb").length;
+        options.push({ key: "ycwb", label: "珠江评论", count: yCount });
       }
 
       const customItems = items.filter((i) => i.sourceKey === "custom");
@@ -1240,6 +1472,7 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
           pill.addEventListener("click", () => {
             config.channel = opt.key;
             visibleCount = batchSize;
+            pageNumber = 1;
             void ctx.saveConfig({ channel: opt.key });
             renderToolbarOptions();
             renderListItems();
@@ -1314,7 +1547,7 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
         const titleRow = content.createDiv({ cls: "hp-media-title-row" });
         const badge = titleRow.createSpan({
           cls: `hp-media-badge hp-media-badge-${item.sourceKey}`,
-          text: item.sourceKey === "qiushi" ? "求是" : item.sourceKey === "zjxc" ? "浙江宣传" : (item.sourceName || "订阅")
+          text: item.sourceKey === "qiushi" ? "求是" : item.sourceKey === "zjxc" ? "浙江宣传" : item.sourceKey === "nfwp" ? "南方网评" : item.sourceKey === "ycwb" ? "珠江评论" : (item.sourceName || "订阅")
         });
         if (item.sourceKey === "qiushi") badge.title = item.issue || "《求是》杂志";
 
@@ -1425,6 +1658,66 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
           text: `— 已显示全部 ${totalItemsCount} 篇文章 —`
         });
       }
+
+      // 网页栏目页翻页：滚到最底部后点一下，抓取并追加栏目页的下一页。
+      const columnUrl = pageableUrl();
+      const nextUrl = columnUrl ? nextPageUrl(columnUrl, pageNumber + 1) : null;
+      if (nextUrl && (config.channel === "nfwp" || config.channel === "ycwb")) {
+        const pager = list.createDiv({ cls: "hp-media-pager" });
+        const nextBtn = pager.createEl("button", {
+          cls: "hp-media-next-page",
+          text: "下一页",
+          attr: { type: "button" }
+        });
+        nextBtn.addEventListener("click", () => {
+          void loadNextPage(nextBtn);
+        });
+        pager.createSpan({ cls: "hp-media-pager-hint", text: `已加载 ${totalItemsCount} 篇` });
+      }
+    };
+
+    /** 抓取并追加下一页；失败时按钮恢复可点，方便重试。 */
+    const loadNextPage = async (btn: HTMLButtonElement): Promise<void> => {
+      const columnUrl = pageableUrl();
+      if (!columnUrl || isPageLoading) return;
+      const targetUrl = nextPageUrl(columnUrl, pageNumber + 1);
+      if (!targetUrl) return;
+      isPageLoading = true;
+      btn.disabled = true;
+      btn.setText("正在加载下一页…");
+      const before = list.scrollHeight;
+      try {
+        const html = await fetchWithTimeout(
+          targetUrl,
+          15000,
+          config.channel === "ycwb" ? MOBILE_UA : undefined
+        );
+        if (!ctx.isAlive()) return;
+        const parsed = config.channel === "ycwb" ? parseYcwbList(html) : parseSouthcnOpinion(html);
+        const seen = new Set(currentItems.map((item) => item.url));
+        const fresh = parsed.filter((item) => item.url && !seen.has(item.url));
+        if (fresh.length === 0) {
+          btn.setText("没有更多文章了");
+          btn.disabled = true;
+          return;
+        }
+        pageNumber += 1;
+        currentItems = [...currentItems, ...fresh];
+        visibleCount += fresh.length;
+        renderListItems();
+        if (list.scrollHeight > before) {
+          list.scrollTop = before - 40;
+        }
+        new Notice(`已加载第 ${pageNumber} 页，共 ${fresh.length} 篇`, 2500);
+      } catch (err) {
+        console.warn("Home Pages: 加载下一页失败", err);
+        if (ctx.isAlive()) {
+          btn.setText("加载失败，点击重试");
+          btn.disabled = false;
+        }
+      } finally {
+        isPageLoading = false;
+      }
     };
 
     // 滚动到底部自动加载更多
@@ -1477,6 +1770,7 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
     const startSync = (forceRefresh = false): void => {
       if (isSyncing) return;
       isSyncing = true;
+      if (forceRefresh) pageNumber = 1;
       refreshBtnEl?.addClass("is-spinning");
       progressTrack.removeClass("is-done");
       progressFill.setCssProps({ "--hp-media-progress": "4%" });
@@ -1551,7 +1845,7 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
 
     new Setting(container).setName("默认显示频道")
       .addDropdown((dropdown) => dropdown
-        .addOptions({ all: "全部聚合", qiushi: "《求是》杂志", zjxc: "浙江宣传", custom: "其他订阅" })
+        .addOptions({ all: "全部聚合", qiushi: "《求是》杂志", zjxc: "浙江宣传", nfwp: "南方网评", ycwb: "羊城晚报", custom: "其他订阅" })
         .setValue(config.channel.startsWith("custom:") || config.channel.startsWith("cat:") ? "custom" : config.channel)
         .onChange((value) => ctx.update({ channel: value })));
 
@@ -1576,6 +1870,22 @@ export const mediaWidget: WidgetDefinition<MediaConfig> = {
 
     new Setting(container).setName("浙江宣传专栏 URL")
       .addText((text) => text.setValue(config.zjxcUrl).onChange((val) => ctx.update({ zjxcUrl: val.trim() })));
+
+    new Setting(container).setName("启用南方网评")
+      .setDesc("南方网（南方网评论频道）的评论文章，含南方快评、叮咚快评等。")
+      .addToggle((toggle) => toggle.setValue(config.showNfwp !== false).onChange((val) => ctx.update({ showNfwp: val })));
+
+    new Setting(container).setName("南方网评栏目 URL")
+      .setDesc("默认 opinion.southcn.com/node_87fa4020d8（南方评论头条，图文文章）；也可换成其它评论子栏目地址。")
+      .addText((text) => text.setValue(config.nfwpUrl).onChange((val) => ctx.update({ nfwpUrl: val.trim() })));
+
+    new Setting(container).setName("启用珠江评论")
+      .setDesc("金羊网「金羊视角」等静态文章栏目页，都是图文文章（不是视频）。")
+      .addToggle((toggle) => toggle.setValue(config.showYcwb !== false).onChange((val) => ctx.update({ showYcwb: val })));
+
+    new Setting(container).setName("珠江评论栏目 URL")
+      .setDesc("默认 sp.ycwb.com/sp_1.htm（珠江评论·金羊视角）；可换成金羊网的其它栏目列表页。")
+      .addText((text) => text.setValue(config.ycwbUrl).onChange((val) => ctx.update({ ycwbUrl: val.trim() })));
 
     addSectionHeading(container, "一键剪藏到本地笔记");
     new Setting(container).setName("启用一键剪藏")

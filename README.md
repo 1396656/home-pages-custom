@@ -1,7 +1,24 @@
 [![English](https://img.shields.io/badge/Language-English-blue)](README.md)
 [![简体中文](https://img.shields.io/badge/Language-简体中文-red)](README.zh-CN.md)
 
-# Home Pages for Obsidian
+# Home Pages for Obsidian (Personal Custom Fork)
+
+> This is a personal customized fork of [jepicaju862-lab/home-pages](https://github.com/jepicaju862-lab/home-pages). On top of the upstream version, it adds:
+>
+> **New widgets**
+> - **Mistakes Reviewer**: draws random questions from a mistake-notes folder, rotating across subjects with per-day progress; question images support click-to-zoom lightbox (wheel zoom / pinch zoom / drag to pan).
+> - **Idiom Review**: parses an idiom-collection note, shows a random idiom with its meaning, and cycles on confirm.
+>
+> **Enhancements**
+> - **Habit Tracker**: new "monthly notes folder" data source (parses `## date` headings for daily tasks); week/month/year grids auto-size to fill the card height; year view scrolls to the latest date by default.
+> - **Pomodoro**: completing a focus session can automatically check off a linked habit for today.
+> - **Quick Links**: supports website shortcuts with automatically fetched favicons and page titles; site icons use a neutral translucent background.
+> - **Media Feed**: adds two column sources (SouthCN Opinion, YCWB Reviews) with "next page" pagination and cross-page dedup.
+>
+> **Mobile adaptation**
+> - Single-column layout now applies only on phones (`Platform.isPhone`); tablets in landscape show multiple columns like desktop; fixed pill buttons being squashed on narrow screens.
+
+---
 
 A modern, modular, and responsive homepage dashboard plugin for Obsidian. Built on a flexible 12-column adaptive grid, it empowers you to customize your workspace with draggable, resizable, and individually configurable widgets. Support multiple pages and third-party plugin integrations.
 

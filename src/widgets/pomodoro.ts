@@ -4,6 +4,7 @@ import type { WidgetInstance } from "../types";
 import { toIsoDate, todayIso } from "../utils/date";
 import { addNumberSetting } from "../ui/settingHelpers";
 import { WidgetContext, WidgetDefinition, clampInt, normalizeWith } from "./types";
+import { checkHabitForDate, listHabitNames } from "./habit";
 
 export type PomodoroPhase = "focus" | "short" | "long";
 export type PomodoroState = "idle" | "running" | "paused";
@@ -31,6 +32,8 @@ export interface PomodoroConfig extends Record<string, unknown> {
   notify: boolean;
   /** 当前番茄要做的事（卡片里直接编辑）。 */
   task: string;
+  /** 专注完成后自动勾选的习惯名（来自习惯打卡卡片）；空字符串表示不关联。 */
+  linkedHabit: string;
   /** 每天完成的番茄数：YYYY-MM-DD → 次数。 */
   history: Record<string, number>;
   session: PomodoroSession;
@@ -56,6 +59,7 @@ const DEFAULTS: PomodoroConfig = {
   sound: true,
   notify: true,
   task: "",
+  linkedHabit: "",
   history: {},
   session: { phase: "focus", state: "idle", endsAt: 0, remainingMs: 0, round: 0 }
 };
@@ -154,6 +158,7 @@ function normalizeConfig(raw: Record<string, unknown>): PomodoroConfig {
   config.longBreakMinutes = clampInt(config.longBreakMinutes, 1, 120, DEFAULTS.longBreakMinutes);
   config.roundsBeforeLongBreak = clampInt(config.roundsBeforeLongBreak, 1, 12, DEFAULTS.roundsBeforeLongBreak);
   config.task = config.task.trim().slice(0, 80);
+  config.linkedHabit = String(config.linkedHabit ?? "").trim().slice(0, 40);
   config.history = normalizeHistory(config.history);
   config.session = normalizeSession(config.session, config);
   return config;
@@ -244,6 +249,15 @@ async function completePomodoro(plugin: HomePagesPlugin, widgetId: string): Prom
   void plugin.saveSettings();
   syncPomodoroTimer(plugin, widgetId);
   plugin.refreshViews({ kind: KIND });
+
+  // 专注结束：如果关联了某个习惯，自动把今天的打卡勾上。
+  if (result.completedFocus && config.linkedHabit) {
+    const date = toIsoDate(new Date(config.session.endsAt));
+    void checkHabitForDate(plugin, config.linkedHabit, date).then((ok) => {
+      if (ok) plugin.refreshViews({ kind: "habit" });
+    });
+  }
+
   announce(config, result.session, result.completedFocus, stale);
 }
 
@@ -375,6 +389,12 @@ export const pomodoroWidget: WidgetDefinition<PomodoroConfig> = {
     }
     rounds.createSpan({ cls: "hp-pomo-count", text: `今日 ${todayCount} · 本周 ${weekCount}` });
 
+    if (config.linkedHabit) {
+      const link = side.createDiv({ cls: "hp-pomo-link", attr: { title: `每完成一个番茄，自动勾选习惯「${config.linkedHabit}」` } });
+      setIcon(link.createSpan({ cls: "hp-pomo-link-icon" }), "badge-check");
+      link.createSpan({ text: `完成后打卡：${config.linkedHabit}` });
+    }
+
     const controls = side.createDiv({ cls: "hp-pomo-controls" });
     const iconButton = (icon: string, label: string, onClick: () => void): HTMLButtonElement => {
       const button = controls.createEl("button", { cls: "hp-pomo-btn clickable-icon", attr: { type: "button", "aria-label": label, title: label } });
@@ -442,6 +462,16 @@ export const pomodoroWidget: WidgetDefinition<PomodoroConfig> = {
       .addToggle((toggle) => toggle.setValue(config.sound).onChange((value) => ctx.update({ sound: value })));
     new Setting(container).setName("系统通知").setDesc("到点时弹出系统通知；Obsidian 内的提示总会显示。")
       .addToggle((toggle) => toggle.setValue(config.notify).onChange((value) => ctx.update({ notify: value })));
+
+    const habitNames = listHabitNames(ctx.plugin);
+    new Setting(container).setName("专注完成自动打卡").setDesc(habitNames.length ? "每完成一个专注段，自动勾选下面这个习惯的今日打卡。" : "先添加一个「习惯打卡」卡片，这里才能选择要关联的习惯。")
+      .addDropdown((dropdown) => {
+        dropdown.addOption("", "不关联");
+        for (const name of habitNames) dropdown.addOption(name, name);
+        dropdown.setValue(config.linkedHabit);
+        dropdown.onChange((value) => ctx.update({ linkedHabit: value }));
+      });
+
     const total = Object.values(config.history).reduce((sum, count) => sum + count, 0);
     new Setting(container).setName("清空番茄记录").setDesc(`已记录 ${total} 个番茄（保留最近 ${HISTORY_DAYS} 天）。`)
       .addButton((button) => button.setButtonText("清空").setWarning().onClick(() => {

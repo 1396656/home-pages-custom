@@ -148,6 +148,7 @@
   /* Keep the visual order consistent with the saved widget order. */
   grid-auto-flow: row;
   gap: var(--hp-gap);
+  container-type: inline-size;
 }
 
 .hp-grid-empty {
@@ -982,6 +983,20 @@
   height: 18px;
 }
 
+/* 网站 favicon：半透明淡灰底色，不与图标本身颜色冲突 */
+.hp-quicklink-icon.is-web {
+  background: rgba(128, 128, 128, 0.14);
+  color: inherit;
+}
+
+.hp-quicklink-icon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: transparent;
+}
+
 .hp-quicklink-label {
   min-width: 0;
   overflow: hidden;
@@ -1228,6 +1243,25 @@
   white-space: nowrap;
 }
 
+.hp-pomo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--hp-accent-soft, rgba(225, 29, 72, 0.1));
+  color: var(--hp-accent, #e11d48);
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.hp-pomo-link-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
 .hp-pomo-controls {
   display: flex;
   align-items: center;
@@ -1459,12 +1493,15 @@
 .hp-habit-toolbar {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
 }
 
 .hp-habit-streak {
   display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
   align-items: center;
   gap: 4px;
   margin-right: auto;
@@ -1485,6 +1522,7 @@
 }
 
 .hp-pill {
+  flex: none;
   padding: 2px 11px;
   border: none;
   border-radius: 999px;
@@ -1494,6 +1532,7 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: none;
+  white-space: nowrap;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
@@ -1560,6 +1599,7 @@
 
 .hp-habit-cal {
   display: flex;
+  flex: 1 1 auto;
   gap: 7px;
   min-height: 0;
   padding: 2px 2px 6px;
@@ -1651,10 +1691,43 @@
   outline-offset: 1px;
 }
 
+/* 月份笔记里没有该日期标题：灰色占位，不参与打卡。 */
+.hp-habit-cell.is-void {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--hp-border);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.hp-habit-cell.is-void:hover {
+  transform: none;
+}
+
+.hp-habit-hint {
+  flex: none;
+  padding: 8px 10px;
+  border: 1px dashed var(--hp-border);
+  border-radius: 8px;
+  color: var(--hp-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hp-habit-chip-add {
+  border-style: dashed;
+}
+
+.hp-habit-today-empty {
+  color: var(--hp-muted);
+  font-size: 12px;
+}
+
 .hp-habit-popover {
   position: fixed;
   z-index: var(--layer-popover, 30);
-  min-width: 150px;
+  min-width: 170px;
+  max-height: 60vh;
+  overflow-y: auto;
   padding: 8px 10px;
   border: 1px solid var(--hp-border);
   border-radius: 10px;
@@ -1676,6 +1749,51 @@
   padding: 3px 0;
   font-size: 13px;
   cursor: pointer;
+}
+
+.hp-habit-popover-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.hp-habit-popover-del {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--hp-muted);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.hp-habit-popover-del:hover {
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+}
+
+.hp-habit-popover-del svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hp-habit-popover-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hp-border);
+}
+
+.hp-habit-popover-add input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---- 任务看板 --------------------------------------------------------------- */
@@ -2074,6 +2192,41 @@
   color: var(--text-error);
 }
 
+.hp-pin-editor-type {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+
+.hp-pin-editor-type .hp-pill {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.hp-pin-favicon-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+  font-size: 12px;
+  color: var(--hp-muted);
+}
+
+.hp-pin-favicon-preview img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.hp-pin-fetching {
+  font-size: 12px;
+  color: var(--hp-muted);
+  padding: 4px 0;
+}
+
 .hp-add-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -2218,23 +2371,26 @@
   line-height: 1.5;
 }
 
-/* ---- 响应式：窄容器时所有卡片占满一行 --------------------------------------- */
+/* ---- 响应式：窄屏与移动端时所有卡片单列铺满 ---------------------------------- */
 
+/* 单列判定只用 Obsidian 官方平台标记 .is-phone（只有手机 App 才带上），
+   不按窗口宽度判断，避免桌面窄窗、系统显示缩放被误判成手机；
+   平板（.is-tablet）不走单列，横屏时像电脑一样多列显示。 */
+.is-phone .hp-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.is-phone .hp-card {
+  grid-column: 1 / -1;
+}
+
+.is-phone .hp-root.is-editing .hp-grid,
+.is-phone .hp-root.is-resizing .hp-grid {
+  background-image: none;
+}
+
+/* 卡片内部元素按卡片自身宽度自适应（.hp-card 是 size 容器）。 */
 @container (max-width: 720px) {
-  .hp-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .hp-card {
-    grid-column: 1 / -1;
-  }
-
-  /* 窄屏卡片总是占满一行，列参考线没有意义。 */
-  .hp-root.is-editing .hp-grid,
-  .hp-root.is-resizing .hp-grid {
-    background-image: none;
-  }
-
   .hp-hero-greeting {
     font-size: 22px;
   }
@@ -3689,6 +3845,30 @@
   border-color: color-mix(in srgb, #38bdf8 40%, transparent);
 }
 
+.hp-media-badge-nfwp {
+  background: color-mix(in srgb, #ea580c 15%, transparent);
+  color: #ea580c;
+  border: 1px solid color-mix(in srgb, #ea580c 30%, transparent);
+}
+
+.theme-dark .hp-media-badge-nfwp {
+  background: color-mix(in srgb, #fb923c 20%, transparent);
+  color: #fb923c;
+  border-color: color-mix(in srgb, #fb923c 40%, transparent);
+}
+
+.hp-media-badge-ycwb {
+  background: color-mix(in srgb, #0d9488 15%, transparent);
+  color: #0d9488;
+  border: 1px solid color-mix(in srgb, #0d9488 30%, transparent);
+}
+
+.theme-dark .hp-media-badge-ycwb {
+  background: color-mix(in srgb, #2dd4bf 20%, transparent);
+  color: #2dd4bf;
+  border-color: color-mix(in srgb, #2dd4bf 40%, transparent);
+}
+
 .hp-media-badge-custom {
   background: color-mix(in srgb, #8b5cf6 15%, transparent);
   color: #8b5cf6;
@@ -4220,13 +4400,12 @@
   }
 }
 
-/* 窄屏 / 手机 / iPad 窄分屏（≤ 620px）：全单列回流 */
+/* 窄屏 / 手机 / iPad 窄分屏（≤ 620px）：内部元素紧凑化。
+   注意：这里不再改 .hp-card 的 grid-column —— 单列只由 .is-mobile 与 JS 内联样式决定，
+   否则桌面窄窗口（含系统显示缩放）会被误判成手机。 */
 @container (max-width: 620px) {
   .hp-grid {
     gap: 12px;
-  }
-  .hp-card {
-    grid-column: 1 / -1;
   }
   .hp-card-hero {
     grid-row: span 6;
@@ -4684,3 +4863,426 @@
   user-select: none;
 }
 
+
+/* ---- 错题本 ---------------------------------------------------------------- */
+.hp-mistakes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 8px;
+}
+
+.hp-mistakes-meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--hp-muted);
+}
+
+.hp-mistakes-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.theme-dark .hp-mistakes-chip {
+  background: color-mix(in srgb, #f87171 20%, transparent);
+  color: #f87171;
+}
+
+.hp-mistakes-chip-icon {
+  display: inline-flex;
+}
+
+.hp-mistakes-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.hp-mistakes-progress {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hp-mistakes-source {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hp-mistakes-source:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
+
+.hp-mistakes-open {
+  display: inline-flex;
+  flex: none;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.hp-mistakes-open:hover {
+  opacity: 1;
+}
+
+.hp-mistakes-open svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hp-mistakes-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 8px;
+  overflow: auto;
+}
+
+.hp-mistakes-question {
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.hp-mistakes-question img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+.hp-mistakes-answer {
+  flex: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--hp-border) 32%, transparent);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.hp-mistakes-answer.is-hidden {
+  display: none;
+}
+
+.hp-mistakes-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.hp-mistakes-btn {
+  flex: 1;
+  height: 30px;
+  font-size: 12.5px;
+}
+
+.hp-mistakes-bar {
+  flex: none;
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--hp-border) 55%, transparent);
+}
+
+.hp-mistakes-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #dc2626;
+  transition: width 0.2s ease;
+}
+
+.hp-mistakes-done {
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.hp-mistakes-done-icon {
+  display: flex;
+  color: #16a34a;
+}
+
+.hp-mistakes-done-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.hp-mistakes-done-title {
+  font-weight: 600;
+}
+
+.hp-mistakes-done-desc,
+.hp-mistakes-hint {
+  font-size: 12px;
+  color: var(--hp-muted);
+}
+
+/* ---- 成语复盘 -------------------------------------------------------------- */
+.hp-idiom {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 10px;
+}
+
+.hp-idiom-meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--hp-muted);
+}
+
+.hp-idiom-progress {
+  font-variant-numeric: tabular-nums;
+}
+
+.hp-idiom-open {
+  display: inline-flex;
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+.hp-idiom-open:hover {
+  opacity: 1;
+}
+
+.hp-idiom-open svg {
+  width: 14px;
+  height: 14px;
+}
+
+.hp-idiom-word {
+  flex: none;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.35;
+  color: var(--text-normal);
+}
+
+.hp-idiom-meaning {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 4px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.hp-idiom-meaning.is-hidden {
+  visibility: hidden;
+}
+
+.hp-idiom-meaning-line {
+  position: relative;
+}
+
+/* 成语卡：内边距 + 进度小标签（覆盖上面的默认值） */
+.hp-idiom {
+  padding: 12px 14px 12px;
+}
+
+.hp-idiom-meta {
+  justify-content: flex-start;
+}
+
+.hp-idiom-progress {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hp-border) 55%, transparent);
+  color: var(--hp-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* 错题卡同样贴边，一并补上内边距 */
+.hp-mistakes {
+  padding: 10px 14px 12px;
+}
+
+/* 成语卡释义：浅色圆角块 + 左侧强调条，内容在剩余高度里垂直居中 */
+.hp-idiom .hp-idiom-meaning {
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px;
+  padding: 14px 16px;
+  border-left: 3px solid #7c3aed;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--hp-border) 24%, transparent);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text-normal);
+  text-align: center;
+}
+
+.hp-idiom-meaning-line {
+  width: 100%;
+}
+
+.hp-idiom-meaning.is-hidden {
+  border-left-color: transparent;
+  background: color-mix(in srgb, var(--hp-border) 12%, transparent);
+}
+
+/* 去掉释义块左侧的紫色强调条 */
+.hp-idiom .hp-idiom-meaning {
+  border-left: none;
+}
+
+/* 完成态：内容居中于剩余空间，按钮贴在卡片底部（与「确定」同高同宽） */
+.hp-idiom-done,
+.hp-mistakes-done {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.hp-done-center {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  text-align: center;
+}
+
+/* 错题图片：可点开看大图 */
+.hp-mistakes-scroll img {
+  cursor: zoom-in;
+}
+
+.hp-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+  animation: hp-lightbox-in 0.14s ease-out;
+}
+
+.hp-lightbox img {
+  max-width: 94vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes hp-lightbox-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 媒体卡片：网页栏目页的「下一页」翻页条 */
+.hp-media-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px 14px;
+}
+
+.hp-media-next-page {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hp-media-next-page:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-accent);
+}
+
+.hp-media-next-page:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hp-media-pager-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* 大图查看：滚轮缩放 / 拖动平移 */
+.hp-lightbox img {
+  cursor: zoom-in;
+  transition: transform 0.08s ease-out;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.hp-lightbox.is-zoomed img {
+  cursor: grab;
+}
+
+.hp-lightbox.is-zoomed img:active {
+  cursor: grabbing;
+}
+
+.hp-lightbox-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* 放大后的图片不撑出滚动条 */
+.hp-lightbox {
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 手机上双指/双击手势由脚本接管，避免浏览器默认缩放与长按菜单 */
+.hp-lightbox img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  pointer-events: auto;
+}

@@ -8,7 +8,7 @@ import { TFile, TFolder } from "obsidian";
 import { createWidgetInstance, getWidgetDefinition, listWidgetDefinitions, onRegistryChange, registerWidget } from "../src/widgets/registry";
 import { sanitizeSettings, sanitizeWidget } from "../src/settings";
 import { CustomWidgetManager, DEMO_WIDGET_TEMPLATE, evaluateWidgetScript } from "../src/widgets/userLoader";
-import { habitStreak } from "../src/widgets/habit";
+import { habitStreak, parseMonthSource, updateDateTask } from "../src/widgets/habit";
 import { advanceSession, bumpHistory, formatClock, pauseSession, pomodoroWidget, remainingMs, resetSession, startSession, type PomodoroConfig } from "../src/widgets/pomodoro";
 
 import { cmaIcon, normalizeHost, parseCoords, qweatherIcon, rankCmaCandidates, splitQuery, stripSuffix } from "../src/utils/weather";
@@ -486,6 +486,44 @@ function testHabitStreak(): void {
   check("streak crosses month boundaries", habitStreak((iso) => iso >= "2026-08-30" && iso <= "2026-09-02", "2026-09-02") === 4);
 }
 
+function testHabitMonthNote(): void {
+  const source = [
+    "## 2026-10-01| 星期四",
+    "- [x] 图推5题",
+    "- [ ] 吃药",
+    "",
+    "## 2026-10-02 | 星期五",
+    "- [ ] 速算20题",
+    "- [x] 吃药",
+    "",
+    "### 其他内容",
+    "- [ ] 子标题下的任务",
+    "",
+    "## 2026-10-03| 星期六",
+    "- [ ] 图推5题",
+    "- [ ] 吃药",
+    ""
+  ].join("\n");
+  const parsed = parseMonthSource(source);
+  check("month note parses date headings", parsed.size === 3 && parsed.get("2026-10-02")?.tasks.length === 3, parsed.size);
+  check("month note keeps checked state", parsed.get("2026-10-01")?.done.has("图推5题") === true && parsed.get("2026-10-01")?.done.has("吃药") === false);
+  check("sub-heading tasks stay in the date section", parsed.get("2026-10-02")?.done.has("子标题下的任务") === false);
+
+  const checked = updateDateTask(source, "2026-10-03", "吃药", "check");
+  check("toggle task to checked", checked.includes("## 2026-10-03| 星期六\n- [ ] 图推5题\n- [x] 吃药"));
+  const unchecked = updateDateTask(checked, "2026-10-03", "吃药", "uncheck");
+  check("toggle task back to unchecked", unchecked.includes("## 2026-10-03| 星期六\n- [ ] 图推5题\n- [ ] 吃药"));
+  const added = updateDateTask(source, "2026-10-02", "图推5题", "add");
+  check("add task appends after existing tasks", added.includes("- [ ] 子标题下的任务\n- [ ] 图推5题\n\n## 2026-10-03"));
+  check("add is idempotent", updateDateTask(added, "2026-10-02", "图推5题", "add") === added);
+  const removed = updateDateTask(source, "2026-10-01", "吃药", "remove");
+  check("remove task drops the line", removed.includes("## 2026-10-01| 星期四\n- [x] 图推5题\n\n## 2026-10-02"));
+  check("remove from missing section is a no-op", updateDateTask(source, "2026-10-09", "吃药", "remove") === source);
+  const created = updateDateTask(source, "2026-10-04", "南方10分钟", "check");
+  check("missing date heading is created", created.includes("## 2026-10-04| 星期日\n- [x] 南方10分钟"));
+  check("created section preserves existing content", created.startsWith(source.trimEnd()));
+}
+
 function testPomodoro(): void {
   const definition = getWidgetDefinition("pomodoro");
   check("pomodoro widget registered", definition?.name === "番茄时钟");
@@ -759,6 +797,7 @@ async function testMediaCachingAndProgress(): Promise<void> {
 testRegistry();
 await testUserCustomWidgets();
 testHabitStreak();
+testHabitMonthNote();
 testPomodoro();
 testWeatherHelpers();
 testMedia();

@@ -1,4 +1,4 @@
-import { ItemView, Menu, TFile, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Platform, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import type HomePagesPlugin from "./main";
 import type { HomePage, WidgetInstance } from "./types";
 import { createId } from "./utils/id";
@@ -329,7 +329,14 @@ export class HomeView extends ItemView {
     const h = Math.min(MAX_ROWS, Math.max(1, widget.h));
     card.setAttribute("data-w", String(w));
     card.setAttribute("data-h", String(h));
-    card.style.setProperty("--hp-card-w", String(w));
+    // 单列判定只用 Obsidian 官方平台标记 Platform.isPhone：只有手机把每张卡片内联锁定为整行
+    // （grid-column 行内样式优先级最高，任何 CSS 规则都盖不掉）。
+    // 平板（isTablet）保留保存的列宽，横屏时和电脑一样多列显示。
+    if (Platform.isPhone) {
+      card.style.gridColumn = "1 / -1";
+    } else {
+      card.style.setProperty("--hp-card-w", String(w));
+    }
     card.style.setProperty("--hp-card-h", String(h));
   }
 

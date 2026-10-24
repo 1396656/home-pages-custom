@@ -14,6 +14,8 @@ import { quicklinksWidget } from "./quicklinks";
 import { quoteWidget } from "./quote";
 import { recentWidget } from "./recent";
 import { mediaWidget } from "./media";
+import { mistakesWidget } from "./mistakes";
+import { idiomsWidget } from "./idioms";
 import { statsWidget } from "./stats";
 import { wechatWidget } from "./wechat";
 import type { WidgetDefinition } from "./types";
@@ -33,6 +35,8 @@ const DEFINITIONS: AnyWidgetDefinition[] = [
   mediaWidget,
   kanbanWidget,
   habitWidget,
+  mistakesWidget,
+  idiomsWidget,
   statsWidget,
   onThisDayWidget,
   noteWidget,
