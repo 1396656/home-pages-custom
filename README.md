@@ -22,10 +22,9 @@
 
 A modern, modular, and responsive homepage dashboard plugin for Obsidian. Built on a flexible 12-column adaptive grid, it empowers you to customize your workspace with draggable, resizable, and individually configurable widgets. Support multiple pages and third-party plugin integrations.
 
-- **Website:** [peyote.info](https://peyote.info/)
-- **Current release:** [v0.3.1](https://github.com/jepicaju862-lab/home-pages/releases/tag/v0.3.1)
+- **Current release:** v0.4.0 ([this repo's Releases](https://github.com/1396656/home-pages-custom/releases))
 - **Minimum Obsidian version:** 1.7.2
-- **Supported platforms:** Desktop and Obsidian Mobile (iOS / Android)
+- **Supported platforms:** Desktop and Obsidian Mobile (iOS / Android / tablets)
 - **License:** [GNU General Public License v3.0](LICENSE)
 
 > [!NOTE]
@@ -43,11 +42,13 @@ Home Pages comes with 12+ built-in productivity widgets that can be freely combi
 | :--- | :--- | :--- |
 | **Welcome Banner** | Greeting by time of day, custom nickname, live clock (optional seconds), weather forecast, vault stats, countdown badge, and customizable background image. | Weather provider (CMA Station / Open-Meteo / QWeather), city/district selection, background mask, field toggles, vault founding date, target date. |
 | **Recent Notes** | Fast access to recently modified or newly created notes with folder paths. | Note count limit, include/exclude folders, sort order, display folder option. |
-| **Quick Access** | Pinned notes, folders, or attachments displayed as interactive icon tiles. | Note path autocomplete, display name, Lucide icon picker, custom order, column count. |
+| **Quick Access** | Pinned notes, folders, attachments, or **websites** as interactive icon tiles; website entries auto-fetch favicons and page titles. | Path/URL autocomplete, display name, Lucide icon picker, custom order, column count. |
 | **Countdown & Anniversaries** | Accurate day count tracking remaining days to goals or elapsed days from anniversaries. | Target date, counting direction (past / future), description and subtitle. |
-| **Pomodoro Clock** | Focus, short break, and long break cycle timer with progress ring, task note, and daily/weekly completion statistics. Timers persist across note switches and restarts. | Stage durations, long break frequency, auto-start breaks, sound alerts, system notifications. |
+| **Pomodoro Clock** | Focus, short break, and long break cycle timer with progress ring and daily/weekly completion statistics. Timers persist across note switches and restarts. **Completing a focus session can automatically check off a linked habit.** | Stage durations, long break frequency, auto-start breaks, sound alerts, system notifications, linked habit. |
 | **Daily Quote** | Display inspiring quotes from a dedicated note (one per line) or custom quote list. | Source note path, daily rotation vs. random, custom quote pool. |
-| **Habit Tracker** | Today's check-in checklist combined with a GitHub-style activity heatmap (week / month / year), plus the current streak. | Habit items list, storage mode (local plugin data or Daily Note task block sync). |
+| **Habit Tracker** | Today's check-in checklist combined with a GitHub-style activity heatmap (week / month / year, cells auto-size to fill card height), plus the current streak. | Habit items list, storage mode (local plugin data / Daily Note / **monthly notes folder**). |
+| **Mistakes Reviewer** | Draws random questions from a mistake-notes folder, rotating across subjects with per-day progress; question images support click-to-zoom lightbox (wheel zoom / pinch zoom / drag to pan). | Root folder, included subfolders, hide answer by default. |
+| **Idiom Review** | Parses an idiom-collection note, shows a random idiom with its meaning, cycles on confirm, and supports extra rounds. | Source note path. |
 | **Task Kanban** | Scans `- [ ]` markdown tasks and arranges them across Todo `[ ]`, Doing `[/]`, and Done `[x]` columns. Supports drag-and-drop status changes and inline task creation. | Source file or folder, default inbox file, column headers, hide completed toggle. |
 | **Vault Statistics** | Overview metrics including notes count, tags, word count, attachments, folders, vault age, created today, and modified this week. | Metric items toggle, grid column layout, exclude folders. |
 | **On This Day** | Surfaces notes created or written on this day across past years. | Item count limit, date property key, filename date fallback, ctime fallback. |
@@ -56,13 +57,13 @@ Home Pages comes with 12+ built-in productivity widgets that can be freely combi
 | **Tasks & Schedule** *(Duowei Table)* | Scans multidimensional tables (`.duowei`), surfaces overdue, today, upcoming, and recent updates with direct row navigation. | Scan scope, exclude tables, date field mappings, section day limits. |
 | **WeChat Inbox** | Aggregates WeChat sync messages with text, audio transcription, and image thumbnails. | Data source, unorganized filter, days range, type filters. |
 | **Annotations & Review** | Connects to Mobile Ink Annotation Pro to show inbox annotations, daily reviews, and collections. | Card statistics, thumbnail preview, one-click jump to annotation center. |
-| **Media & RSS Subscriptions** | Surfaces articles from mainstream sources and personal custom RSS / OPML feeds. Supports Follow exports, nested categories, podcast/video detection, and offline Markdown clipping. | Channel nav style, default channel, OPML import/export, category organization, clipping folder. |
+| **Media & RSS Subscriptions** | Surfaces articles from mainstream sources and personal custom RSS / OPML feeds, with two added column sources (SouthCN Opinion, YCWB Reviews) and "next page" pagination with cross-page dedup. | Channel nav style, default channel, OPML import/export, category organization, clipping folder. |
 
 ---
 
 ## 📐 Responsive 12-Column Layout
 
-- **12-Column Adaptive Grid**: Automatically reflows and scales proportionately based on viewport width, providing a native visual layout on both desktop ultrawide monitors and mobile devices.
+- **12-Column Adaptive Grid**: Automatically reflows and scales proportionately based on viewport width; phones get a full-width single column, while tablets in landscape keep multiple columns like desktop.
 - **WYSIWYG Layout Editing**:
   - Click **Edit Layout** in the header to enter arrangement mode.
   - Drag cards with a mouse, or drag their title/grip on touchscreens. Insertion markers support rows, columns, and gaps; dragging near the view edge scrolls automatically. Press Esc to cancel.
@@ -77,79 +78,23 @@ Home Pages comes with 12+ built-in productivity widgets that can be freely combi
 
 ## 🔌 Host API for Plugin Developers
 
-Home Pages exposes a lightweight host API allowing other Obsidian plugins to register custom widgets and views into the homepage framework:
+Home Pages exposes a lightweight host API (`app.plugins.plugins["home-pages"]?.api`) allowing other Obsidian plugins to register custom widgets, pin views to the homepage, trigger dashboard redraws, and reuse the built-in UI rendering helpers.
 
-```ts
-// Retrieve the API instance when Home Pages is loaded (or listen to "home-pages:ready")
-const api = app.plugins.plugins["home-pages"]?.api;
-
-// 1. Register a new widget type
-const unregister = api.registerWidget(myWidgetDefinition, "my-plugin-id");
-
-// 2. Programmatically pin a widget to the current homepage
-api.pinWidget("my-widget-kind", { ref: "note-path" }, {
-  title: "My Pinned View",
-  w: 6,
-  h: 4,
-  provider: "my-plugin-id"
-});
-
-// 3. Trigger a dashboard redraw when underlying data changes
-api.refresh("my-widget-kind");
-
-// 4. Utilize consistent UI rendering helpers
-api.ui.renderKpi(containerEl, { label: "Completed", value: 12 });
-api.ui.renderEmpty(containerEl, { message: "No data available" });
-```
-
-> **Integration Example:** **Duowei Table (duowei-table-pro ≥ 1.4.0)** registers `duowei-view` via the Host API. Users can right-click any table view tab and select "Pin to Homepage" to display live calendars, kanban boards, and progress timelines on their homepage.
+> **Integration Example:** **Duowei Table (duowei-table-pro ≥ 1.4.0)** registers `duowei-view` via the Host API. Users can right-click any table view tab and select "Pin to Homepage".
 
 ---
 
 ## 🧩 User-Defined Custom Widgets (Folder-based & Hot-Reload)
 
-Users can build custom widgets directly in JavaScript without creating separate plugins:
-
-1. In plugin settings, navigate to **"Custom Widgets"**.
-2. Set the **"Custom Widgets Folder"** (e.g. `_scripts/home-pages/`), or click **"📄 Create Demo Widget Template"** to auto-generate `demo-widget.js`.
-3. Create or edit `.js` files exporting a standard widget definition:
-   ```javascript
-   module.exports = {
-     kind: "user-clock",
-     name: "Custom Clock",
-     description: "Real-time clock widget",
-     icon: "clock",
-     accent: "#6366f1",
-     defaultSize: { w: 4, h: 3 },
-     defaultConfig: () => ({ greeting: "Hello" }),
-     render(body, ctx) {
-       body.empty();
-       const el = body.createDiv();
-       el.setText(`${ctx.config.greeting} · ${new Date().toLocaleTimeString()}`);
-       ctx.registerInterval(() => {
-         el.setText(`${ctx.config.greeting} · ${new Date().toLocaleTimeString()}`);
-       }, 1000);
-     }
-   };
-   ```
-4. **Save and it appears**: The first time a new script loads, its widget is added to the current page (once per widget; editing a script after you removed its card does not add it back; turn off with **Add new custom widgets automatically**).
-5. **Live Hot-Reload**: Save modifications to your `.js` file from Obsidian or an external editor like VS Code, and homepage cards will **automatically reload and re-render instantly**!
+Users can build custom widgets directly in JavaScript without creating separate plugins: set a **Custom Widgets Folder** in settings (or generate the demo template `demo-widget.js`), then export a standard widget definition from any `.js` file in that folder. New widgets appear on the current page on first load, and saving changes to the script **hot-reloads the card instantly**.
 
 ---
 
 ## 📥 Installation
 
-### Method 1: Obsidian Community Plugins (Recommended)
+This customized fork is not published to the Obsidian Community Plugins directory. Install it manually:
 
-Once available in the official Obsidian Community Plugins directory:
-1. In Obsidian, go to **Settings → Community plugins**.
-2. Turn off **Restricted mode** and click **Browse**.
-3. Search for **Home Pages**.
-4. Click **Install**, then click **Enable**.
-
-### Method 2: Manual Installation
-
-1. Download the latest release assets from the [GitHub Releases](https://github.com/jepicaju862-lab/home-pages/releases) page:
+1. Download the latest release assets from [this repo's Releases page](https://github.com/1396656/home-pages-custom/releases):
    - `main.js`
    - `manifest.json`
    - `styles.css`
@@ -207,7 +152,7 @@ Once available in the official Obsidian Community Plugins directory:
 ## ❓ FAQ
 
 ### Will layout break on mobile devices?
-No. Home Pages provides responsive adaptive rules for small screens. On narrow viewports, the grid seamlessly collapses into full-width or compact columns optimized for touch interaction.
+No. Phones automatically get a full-width single-column layout, while tablets keep the multi-column layout (landscape behaves like desktop). Card internals adapt to card width, and touch targets are enlarged for touchscreens.
 
 ### Does the Pomodoro timer keep running if I switch notes or restart Obsidian?
 Yes. The timer state and start timestamp are persisted in plugin memory and data. Switching views or restarting Obsidian restores the timer seamlessly.
@@ -245,18 +190,8 @@ For detailed changelogs and version release histories, see [RELEASE_NOTES.md](RE
 
 ## 🤝 Support & Feedback
 
-- **Bug Reports & Feature Requests — [this repository's issue tracker](https://github.com/jepicaju862-lab/home-pages/issues).** Please include your Obsidian version, operating system, and reproduction steps whenever possible.
-- **Questions & Discussion — QQ group `1094620986`.** The group communicates primarily in Simplified Chinese.
-- **Email — <jepicaju862@gmail.com>.** Use email for private reproduction files or inquiries.
-- **Official Website — [peyote.info](https://peyote.info/).**
-
----
-
-## 📬 Contact
-
-- **QQ group:** `1094620986`
-- **Email:** <jepicaju862@gmail.com>
-- **Website:** [peyote.info](https://peyote.info/)
+- **Bug Reports & Feature Requests — [this repository's issue tracker](https://github.com/1396656/home-pages-custom/issues).** Please include your Obsidian version, operating system, and reproduction steps whenever possible.
+- For issues with the original project, please visit the upstream repository [jepicaju862-lab/home-pages](https://github.com/jepicaju862-lab/home-pages).
 
 ---
 
