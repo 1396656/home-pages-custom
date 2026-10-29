@@ -107,6 +107,8 @@ export const idiomsWidget: WidgetDefinition<IdiomsConfig> = {
       revealed = !revealed;
       meaning.toggleClass("is-hidden", !revealed);
       toggleBtn.setText(revealed ? "收起释义" : "看释义");
+      // 手动切换与「默认隐藏释义」共用同一配置，保证下一个成语沿用当前显隐状态。
+      void ctx.saveConfig({ hideMeaning: !revealed });
     });
 
     const confirmBtn = actions.createEl("button", { text: "确定，下一个" });

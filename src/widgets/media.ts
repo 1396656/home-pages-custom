@@ -1155,7 +1155,8 @@ function renderSkeleton(container: HTMLElement, count = 4): HTMLElement {
 /** 把 HTML 简单转为清晰可读的 Markdown 正文 */
 export function htmlToMarkdown(html: string): string {
   let containerHtml = html;
-  const detailMatch = html.match(/<div[^>]+id=["']detailContent["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)
+  const detailMatch = html.match(/<!--enpcontent-->([\s\S]*?)<!--\/enpcontent-->/i)
+    || html.match(/<div[^>]+id=["']detailContent["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)
     || html.match(/<div[^>]+(?:id=["']js_content["']|class=["'][^"']*rich_media_content[^"']*["'])[^>]*>([\s\S]*?)<\/div>/i)
     || html.match(/<div[^>]+class=["'](?:doc-html-content|news_content|content)["'][^>]*>([\s\S]*?)<\/div>/i)
     || html.match(/<div[^>]+id=["']detail["'][^>]*>([\s\S]*?)<\/div>/i);
@@ -1206,7 +1207,8 @@ export async function clipArticleToVault(app: App, item: MediaItem, folderName: 
     bodyMd = htmlToMarkdown(item.fullHtml);
   } else {
     try {
-      const rawHtml = await fetchText(item.url);
+      // 金羊网对桌面 UA 返回反爬页，文章正文同样需要用移动端 UA 抓取
+      const rawHtml = await fetchText(item.url, item.url.includes("ycwb.com") ? MOBILE_UA : undefined);
       bodyMd = htmlToMarkdown(rawHtml);
     } catch (err) {
       console.warn("Home Pages: 获取文章正文失败，使用摘要兜底", err);
